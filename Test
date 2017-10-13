@@ -1,0 +1,8 @@
+#!/bin/bash
+filelist=(ant camel eclipse itextpdf jEdit liferay lucene struts tomcat synapse voldemort)
+
+for file in ${filelist[@]}
+	do 	
+		echo "------"$file"-------"
+		
+	done

@@ -1,0 +1,14 @@
+#!/bin/bash
+# /bin/ls Jar/ | gawk '{print "Jar/"$1}' | tr -s '\n' ':'
+
+dir_path="/home/yueyang/workspace/ChangeCache/Result/"
+project_list=(ant camel eclipse itextpdf jEdit liferay lucene struts tomcat synapse voldemort)
+file_list=`ls dir_path`
+for project in ${project_list[@]}
+do
+	dir=$dir_path$project'6/'
+	file=$dir'*.filedist.csv'
+	cat $file| awk '{FS=","} {if ($8=="true") print "in_cache:"$8}'| wc -l
+	
+done
+
