@@ -81,7 +81,8 @@ public class CoChange {
     public static ArrayList<Integer> getCoChangeFileList(int fileid, String startDate,
             String commitDate, int blocksize) throws Exception {
         CoChange co = new CoChange(fileid);
-        return co.getCoChangeList(co.buildCoChangeMap(startDate, commitDate), blocksize);//,true
+        return co.getCoChangeList(co.buildCoChangeMap(startDate, commitDate,true), blocksize);//
+        //return co.getCoChangeList(co.buildCoChangeMap(startDate, commitDate), blocksize);//,true
     }
 
     /**
@@ -134,9 +135,10 @@ public class CoChange {
     
     private CoChangeFileMap buildCoChangeMap(String startDate, String commitDate, boolean association) throws Exception {
         CoChangeFileMap coChangeCounts = new CoChangeFileMap();
-        //对于特定的file_id，查找从初始commit_date到当前commit_date之间的，更改了该file_id的所有commit_id
-        //也即找到当前时间以前，和file_id一起更改的那些file_id并且统计一起更改的次数
-        // get a list of all prior commits for fileID before commitID:
+        //将每一次commit看作一次transaction，
+        //找到从其实commit到最新commit之间所有的transaction
+        //在这些transaction上挖掘关联规则
+        //1.找到所有的commitId
         final PreparedStatement allCommitIdQuery = getAllCommitIdStatement();
         ArrayList<Integer> commitList = new ArrayList<Integer>();
 
@@ -147,47 +149,44 @@ public class CoChange {
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        //遍历这些commit_id
+        //2.遍历这些commit_id
         // for each commit in the list, get a list of all fileIDs involved in
-        // that commit
+        
         int coChangeCommitID;
         ResultSet r2;
         int coChangeFile;
         final PreparedStatement cochangeFileIdQuery = getCochangeFileIdStatement();
         
-        Map<Integer,List<Integer>> data= new HashMap<Integer,List<Integer>>();//*
-		List<Integer> fileList= new LinkedList<Integer>();//*
+        Map<Integer,List<Integer>> transactionData= new HashMap<Integer,List<Integer>>();//*
+		List<Integer> AllFileList= new LinkedList<Integer>();//*
 		int n = 0;//*,true
-        for (int i = 0; i < commitList.size(); i++) {//对于每一个commit_id，找到所有发生更改的file_id
-        	//System.out.print(n++ + ":" + "\t");//*
+        for (int i = 0; i < commitList.size(); i++) {
+        	//System.out.print(n++ + ":" + "\t");
+        	//3.对于每一个commitID,将本次修改的所有fileId组合成一个transaction
             coChangeCommitID = commitList.get(i);
             try {
+            	//对于每一个commit_id，找到所有发生更改的file_id
                 cochangeFileIdQuery.setInt(1, coChangeCommitID);
                 r2 = cochangeFileIdQuery.executeQuery();
                 
-                List<Integer> list= new LinkedList<Integer>();
-				
+                List<Integer> fileList= new LinkedList<Integer>();
                 while (r2.next()) {
                     coChangeFile = r2.getInt(1);
                     //System.out.print(coChangeFile + "\t");//*
-                    if (coChangeFile != fileID) {
-                        // coChangeList.add(r2.getInt(1));
-                        coChangeCounts.add(coChangeFile);//记录该file_id发生更改的次数
-                        list.add(coChangeFile);//*
-                    }
-                    if(!fileList.contains(coChangeFile)){
-    					fileList.add(coChangeFile);
+                    fileList.add(coChangeFile);//*
+                    if(!AllFileList.contains(coChangeFile)){
+                    	AllFileList.add(coChangeFile);
     				}
-                    
                 }
                 //System.out.println();
-                data.put(coChangeCommitID, list);//*
+                if(fileList.size() != 0) transactionData.put(coChangeCommitID, fileList);//*
             } catch (SQLException e) {
                 e.printStackTrace();
             }
         }
-        if(fileList.size()==0) return coChangeCounts;
-        Instances ins = FileUtil.ReadData(FileUtil.Write2TempArff(fileList, data));
+        //开始关联规则挖掘
+        Instances ins = FileUtil.ReadData(FileUtil.Write2TempArff(AllFileList, transactionData));
+        
         weka.associations.Apriori ap = new Apriori();
         ap.buildAssociations(ins);
         FastVector[] rules = ap.getAllTheRules();

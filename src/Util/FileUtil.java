@@ -127,31 +127,31 @@ public static boolean WriteArff2CSV(Instances ins,String filePath){
 		return ind;
 	 } 
 
-	public static String Write2TempArff(List<Integer> fileList, Map<Integer, List<Integer>> data) throws IOException{
+	public static String Write2TempArff(List<Integer> allFileList, Map<Integer, List<Integer>> data) throws IOException{
 		String outPath = "/home/yueyang/workspace/ChangeCache/Results/association/" + "test.arff";
 		BufferedWriter bWriter = new BufferedWriter(new FileWriter(outPath));
 		//StringBuffer sb = new StringBuffer();
 		bWriter.append("@relation files" + "\n");
 		//bWriter.append("@attribute 'commit_id' numeric" + "\n");
-		for(int i = 0 ; i < fileList.size(); i++){
-			String file_id = String.valueOf(fileList.get(i));
+		for(int i = 0 ; i < allFileList.size(); i++){
+			String file_id = String.valueOf(allFileList.get(i));
 			bWriter.append("@attribute 'file_" + file_id + "' { t}" + "\n");
 		}
 		bWriter.append("@data" + "\n");
-		Set<Integer> commitIds = data.keySet();
-		int[] cnt = new int[fileList.size()];
-		for(Integer commit_id : commitIds){
-			//System.out.print(n++ + ":" + "\t");
+
+		int[] cnt = new int[allFileList.size()];
+		for(Integer commit_id : data.keySet()){
+			System.out.print(commit_id + ":" + "\t");
 			List<Integer> list = data.get(commit_id);
-			//for(int j = 0 ; j < list.size(); j++){
-				//System.out.print(list.get(j) + "\t");
-			//}
-			//System.out.println();
+			for(int j = 0 ; j < list.size(); j++){
+				System.out.print(list.get(j) + "\t");
+			}
+			System.out.println();
 		
 			StringBuffer temp = new StringBuffer();
-			for(int j = 0 ; j < fileList.size(); j++){
+			for(int j = 0 ; j < allFileList.size(); j++){
 				//temp.append(commit_id+",");
-				if(list.contains(fileList.get(j))){
+				if(list.contains(allFileList.get(j))){
 					temp.append("t"+",");
 					cnt[j]++;
 				}else{

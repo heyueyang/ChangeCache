@@ -60,7 +60,7 @@ public class Simulator {
     static PreparedStatement findFileAliveCountQuery;
     //static PreparedStatement findCurrentFileCountQuery;
     
-    static String[] projects = {"ChangeClassify", "voldemort","ant","camel","eclipse", "itextpdf","jEdit","liferay","struts","tomcat"};//*
+    static String[] projects = {"voldemort","ant","camel","eclipse", "itextpdf","jEdit","liferay","struts","tomcat"};//*
     static String result_dir = "Results/";//*
 
     /**
@@ -650,6 +650,7 @@ public class Simulator {
         	if(!new File(result_dir).exists()){					//*
             	new File(result_dir).mkdirs();		//*
         	}else{
+        		System.out.println("Result path : " + result_dir + " already exists， Exit！");
         		System.exit(0);
         		//return;
         	}
