@@ -3,7 +3,9 @@ package Cache;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.ArrayList;
 
+import Cache.CacheItem.CacheReason;
 import Cache.CacheReplacement.Policy;
 import Database.DatabaseManager;
 
@@ -19,17 +21,17 @@ public class CacheItem {
         "where id in( " +
             "select author_id from scmlog, actions " +
             "where scmlog.id = actions.commit_id " +
-                "and date between ? and ? and file_id = ?)";
+                "and scmlog.commit_date between ? and ? and file_id = ?)";
     static final String findNumberOfChanges = 
         "select count(actions.id) " +
         "from actions, scmlog " +
         "where actions.commit_id = scmlog.id " +
-        "and date between ? and ? and file_id=?";
+        "and scmlog.commit_date between ? and ? and file_id=?";
     static final String findNumberOfBugs = 
         "select count(commit_id) from actions " +
         "where file_id=? and commit_id in " +
             "(select id from scmlog " +
-            "where is_bug_fix=1 and date between ? and ?)";
+            "where is_bug_fix=1 and scmlog.commit_date between ? and ?)";
     static final String findLoc = 
         "select loc from content_loc where file_id=? and commit_id =?";
     private static PreparedStatement findNumberOfAuthorsQuery;
@@ -53,15 +55,19 @@ public class CacheItem {
     private int loadCount = 0; //count how many time a file is put into cache 
     private int loadDuration = 0; //represents how long in repo time a file stays in cache
     private String timeAdded; //represents repo time when a file is added to cache
+    private String lastLoadDate; 
     private final Cache parent;
     private boolean inCache = false; // stores whether the cacheitem is in the cache
     private int hitCount = 0;
     private int missCount = 0;
-    private int[] hitTypeCnt = new int[3];
+    private int[] hitTypeCnt = new int[4];
+    private int[] loadTypeCnt = new int[4];
+    private ArrayList<int[]> lastTypeCnt = new ArrayList<int[]>();
     public static int constructCnt = 0;
 
     @SuppressWarnings("unused") // may be useful output
-    private CacheReason reason; 
+    private CacheReason reason;
+	private String lastCommitDate; 
 
     /**
      * Methods
@@ -91,21 +97,39 @@ public class CacheItem {
         // update the load count each time an entry is added to the cache
         if (!inCache){
             inCache = true;
-            loadCount++;
-            timeAdded = cdate;
-            reason = r;//update the reason to current reason
-            if (r == CacheReason.BugEntity)
+            loadTypeCnt[r.ordinal()]++;//calculate the reason of every load
+            loadCount++;    
+            
+            if (r == CacheReason.BugEntity){
                 missCount++;
+                if(lastCommitDate != null){
+                	lastTypeCnt.add(new int[]{reason.ordinal(),Util.Dates.getMinuteDuration(lastCommitDate,cdate)});
+                	//System.out.println(lastCommitDate+"------------"+cdate+"="+Util.Dates.getMinuteDuration(lastCommitDate,cdate));
+                }
+            }
+            timeAdded = cdate;
+            
         } else { //is in cache
             if (r == CacheReason.BugEntity){            
                 hitCount++;
-                hitTypeCnt[reason.ordinal()]++;//calculate the hit reason of every hit
+                hitTypeCnt[r.ordinal()]++;//calculate the hit reason of every hit
+                if(lastCommitDate != null){
+                	lastTypeCnt.add(new int[]{reason.ordinal(),Util.Dates.getMinuteDuration(lastCommitDate,cdate)});
+                }
             }
         }
+        //System.out.println(r + "-----" + cid+"------------"+cdate+"---------------"+lastCommitDate);
+        if(r != CacheReason.CoChange && r != CacheReason.Prefetch) {
+        	lastCommitDate = cdate;
+            LOC = findLoc(entityId, cid);
+            number = findNumber(entityId, parent.repID, cdate, sdate, parent.getPolicy());
+        }
+        lastLoadDate = cdate;
+        reason = r;//update the reason to current reason
         loadDate = parent.getTime(); 
-        LOC = findLoc(entityId, cid);
-        number = findNumber(entityId, parent.repID, cdate, sdate, parent.getPolicy());
     }
+    
+    
     
     public boolean isInCache(){
         return inCache;
@@ -115,6 +139,7 @@ public class CacheItem {
         loadDuration += Util.Dates.getMinuteDuration(timeAdded, cdate);
         assert(inCache);
         inCache = false;
+        lastCommitDate = cdate;
         return loadDuration;
     }
 
@@ -323,6 +348,13 @@ public class CacheItem {
     }
     public int[] getHitTypeCnt() {
         return hitTypeCnt;
+    }
+    public int[] getLoadTypeCnt() {
+        return loadTypeCnt;
+    }
+    
+    public ArrayList<int[]> getLastTypeCnt() {
+        return lastTypeCnt;
     }
 
 }

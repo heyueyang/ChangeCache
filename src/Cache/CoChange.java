@@ -81,8 +81,8 @@ public class CoChange {
     public static ArrayList<Integer> getCoChangeFileList(int fileid, String startDate,
             String commitDate, int blocksize) throws Exception {
         CoChange co = new CoChange(fileid);
-        return co.getCoChangeList(co.buildCoChangeMap(startDate, commitDate,true), blocksize);//
-        //return co.getCoChangeList(co.buildCoChangeMap(startDate, commitDate), blocksize);//,true
+        //return co.getCoChangeList(co.buildCoChangeMap(startDate, commitDate,true), blocksize);//
+        return co.getCoChangeList(co.buildCoChangeMap(startDate, commitDate), blocksize);//,true
     }
 
     /**
@@ -189,19 +189,20 @@ public class CoChange {
         
         weka.associations.Apriori ap = new Apriori();
         ap.buildAssociations(ins);
+        ap.setMinMetric(0);
         FastVector[] rules = ap.getAllTheRules();
 		for(int i = 0 ; i < rules[0].size(); i++){
-			System.out.print((i+1) + ":");
-			System.out.print(((AprioriItemSet)rules[0].elementAt(i)).toString(ins));
-			System.out.print("==>" );
-			System.out.print(((AprioriItemSet)rules[1].elementAt(i)).toString(ins));
+			//System.out.print((i+1) + ":");
+			//System.out.print(((AprioriItemSet)rules[0].elementAt(i)).toString(ins));
+			//System.out.print("==>" );
+			//System.out.print(((AprioriItemSet)rules[1].elementAt(i)).toString(ins));
 			/*AprioriItemSet rule = (AprioriItemSet) info[i];
 			int[] items = rule.items();
 			for(int k = 0 ; k <items.length ; k++){
 				System.out.print((items[k]==-1)?"":ins.attribute(items[k]).name() + "\t");
 			}*/
 			
-			System.out.println("\t" + rules[2].elementAt(i));
+			//System.out.println("\t" + rules[2].elementAt(i));
 			
 		}
         return coChangeCounts;

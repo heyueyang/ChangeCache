@@ -105,7 +105,7 @@ public class DatabaseManager {
     }
 
     public static Connection getConnection() {
-    	System.out.println("getConnection called!");
+    	//System.out.println("getConnection called!");
         if (dbManager == null) {
             dbManager = new DatabaseManager("database.properties");
         }
@@ -113,7 +113,7 @@ public class DatabaseManager {
     }
     //*
     public static Connection getConnection(String db) {
-    	System.out.println(db + " my  getConnection called!");
+    	System.out.println(db + " my getConnection called!");
         //if (dbManager == null) {
             dbManager = new DatabaseManager("database.properties", db);
         //}

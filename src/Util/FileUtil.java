@@ -141,12 +141,12 @@ public static boolean WriteArff2CSV(Instances ins,String filePath){
 
 		int[] cnt = new int[allFileList.size()];
 		for(Integer commit_id : data.keySet()){
-			System.out.print(commit_id + ":" + "\t");
+			//System.out.print(commit_id + ":" + "\t");
 			List<Integer> list = data.get(commit_id);
-			for(int j = 0 ; j < list.size(); j++){
-				System.out.print(list.get(j) + "\t");
-			}
-			System.out.println();
+			//for(int j = 0 ; j < list.size(); j++){
+			//	System.out.print(list.get(j) + "\t");
+			//}
+			//System.out.println();
 		
 			StringBuffer temp = new StringBuffer();
 			for(int j = 0 ; j < allFileList.size(); j++){
@@ -163,7 +163,7 @@ public static boolean WriteArff2CSV(Instances ins,String filePath){
 			
 			bWriter.flush();
 			bWriter.close();
-			System.out.println("writed into" + outPath);
+			//System.out.println("writed into" + outPath);
 	
 			//for(int j = 0 ; j < fileList.size(); j++){
 			//	System.out.println(j+ "," + fileList.get(j) + "," + cnt[j]);

@@ -87,6 +87,7 @@ public class Cache implements Iterable<CacheItem>{
      * @param reason -- reason for adding to the cache
      */
     public void add(int eid, int cid, String cdate, CacheReason reason) {
+    	//System.out.print(eid+" : ");
         if (cacheTable.containsKey(eid)){ // either in cache or was bumped out
             CacheItem ci = cacheTable.get(eid);
             if (!ci.isInCache()){

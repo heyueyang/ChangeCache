@@ -1,0 +1,19 @@
+#!/bin/bash
+# /bin/ls Jar/ | gawk '{print "Jar/"$1}' | tr -s '\n' ':'
+
+JARS=bin:Jar/dbunit-2.4.8.jar:Jar/junit-4.8.1.jar:Jar/log4j-1.2.16.jar:Jar/mysql-connector-java-5.1.13-bin.jar:Jar/slf4j-api-1.6.1.jar:Jar/slf4j-simple-1.6.1.jar:Jar/joda-time-1.6.2/joda-time-1.6.2-sources.jar:Jar/joda-time-1.6.2/joda-time-1.6.2.jar:Jar/javacsv.jar:Jar/weka.jar
+ 
+java -version
+
+filelist=(ant camel eclipse itextpdf jEdit liferay lucene struts tomcat synapse voldemort)
+
+for file in ${filelist[@]}
+	do 	
+		echo "------"$file"-------"
+		new='URL:jdbc:mysql://localhost:3306/'$file
+		sed -i "2s#.*#$new#g" /home/yueyang/workspace/ChangeCache/database.properties
+		java -cp $JARS Cache.StatisSimulator -p 1 -o true -n $file -v true -d "./Results/Result_locality/"
+		#java -cp $JARS Cache.Simulator -b 10000  -c 500  -f 600  -r "LRU"  -p 1 -o true -n $file -d "./Results/Result_para/"
+		echo "------"$file" finished-------"
+		
+	done

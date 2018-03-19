@@ -12,8 +12,8 @@ for file in ${filelist[@]}
 		echo "------"$file"-------"
 		new='URL:jdbc:mysql://localhost:3306/'$file
 		sed -i "2s#.*#$new#g" /home/yueyang/workspace/ChangeCache/database.properties
-		java -cp $JARS Cache.Simulator -p 1 -o true -n $file  
-		#java -cp $JARS Cache.Simulator -b 10000  -c 500  -f 600  -r "LRU"  -p 1 -o true -n $file 
+		java -cp $JARS Cache.Simulator -p 1 -o true -n $file -d "./Results/Result_run/"
+		#java -cp $JARS Cache.Simulator -b 10000  -c 500  -f 600  -r "LRU"  -p 1 -o true -n $file -d "./Results/Result_run/"
 		echo "------"$file" finished-------"
 		
 	done

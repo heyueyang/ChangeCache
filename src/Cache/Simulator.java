@@ -59,9 +59,9 @@ public class Simulator {
     static PreparedStatement findFileCountQuery;
     static PreparedStatement findFileAliveCountQuery;
     //static PreparedStatement findCurrentFileCountQuery;
-    
+    static int CountChanged;
     static String[] projects = {"voldemort","ant","camel","eclipse", "itextpdf","jEdit","liferay","struts","tomcat"};//*
-    static String result_dir = "Results/";//*
+    static String result_dir = "Results/Result_parameter/";//*
 
     /**
      * From the actions table. See the cvsanaly manual
@@ -107,7 +107,7 @@ public class Simulator {
         int onepercent = getPercentOfFiles(pid);
 
         if (bsize == -1)
-            blocksize = onepercent*5;//默认的blocksize为总文件数量的5%
+            blocksize = onepercent*5;//默认的blocksize为总文件数量的5%，10%
         else
             blocksize = bsize;
         if (csize == -1)
@@ -115,7 +115,7 @@ public class Simulator {
         else
             cachesize = csize;
         if (psize == -1)
-            prefetchsize = onepercent*1;//默认的prefetchsize为总文件数量的1%
+            prefetchsize = onepercent*1;//默认的prefetchsize为总文件数量的1%，5%
         else
             prefetchsize = psize;
 
@@ -146,7 +146,7 @@ public class Simulator {
                         + ", prefetchsize: " + prefetchsize
                         + ", cache replacement policy: " + cacheRep);*/
                 csvWriter.writeComment("project: " + pid +  ", total_files: " + total_files + ", total_files_alive: " + total_files_alive  + ", cacheTableSize: " + cache.getCacheSizeEver() + ", cachesize: " + cachesize
-                        + ", blocksize: " + cachesize + ", prefetchsize: "
+                        + ", blocksize: " + blocksize + ", prefetchsize: "
                         + prefetchsize + ", cache replacement policy: " + cacheRep);
                 csvWriter.write("Month");
                 //csvWriter.write("Range");
@@ -177,11 +177,12 @@ public class Simulator {
             findFileCountQuery.setInt(1, projid);
             ret = Util.Database.getIntResult(findFileCountQuery);
             total_files = ret;
-            
             findFileAliveCountQuery = conn.prepareStatement(findFileAliveCount); 
             //findFileCountQuery.setInt(1, projid);
             ret = Util.Database.getIntResult(findFileAliveCountQuery);
             total_files_alive = ret; 
+            //System.out.println("total_files : " + total_files);
+            //System.out.println("total_files_alive : " + total_files_alive);
         } catch (SQLException e1) {
             e1.printStackTrace();
         }
@@ -222,7 +223,7 @@ public class Simulator {
             miss++;
 
         cache.add(fileId, cid, commitDate, CacheItem.CacheReason.BugEntity);//时间局部性，将自身加入cache
-
+        CountChanged++;
         // add the co-changed files as well
         ArrayList<Integer> cochanges = CoChange.getCoChangeFileList(fileId,
                 cache.startDate, intro_cdate, blocksize);
@@ -337,6 +338,7 @@ public class Simulator {
 
     private int processOneFile(int cid, String cdate, boolean isBugFix,
             int file_id, FileType type, int numprefetch) throws Exception {
+    	//System.out.print(cid + " : " + file_id+"*********");
         switch (type) {
         case V:
             break;
@@ -345,7 +347,7 @@ public class Simulator {
         case A:
             if (numprefetch < prefetchsize) {//添加局部性，如果该文件是新添加的，将该文件预取到内存中
                 numprefetch++;//预加载计数器加1
-                cache.add(file_id, cid, cdate, CacheItem.CacheReason.Prefetch);//将该条记录加入cache
+                cache.add(file_id, cid, cdate, CacheItem.CacheReason.NewEntity);//将该条记录加入cache
             }
             break;
         case D:
@@ -355,24 +357,31 @@ public class Simulator {
             break;
         case M: // modified
         	this.loadBuggyEntity(file_id, cid, cdate, cdate);//向cache中加载，引入日期的相应的记录
-        	//this.loadChangeEntity(file_id, cid, cdate);
-        	
-            //if (isBugFix ){// && numprefetch < prefetchsize缺陷局部性，如果这条记录是修复bug的记录，将引入该bug的时间时的该文件加入缓存中
-            	//numprefetch++;
-                //cache.add(file_id, cid, cdate, CacheItem.CacheReason.BugEntity);//缺陷局部性
-            	
-            	//this.loadChangeEntity(file_id, cid, cdate);//向cache中加载，引入日期的相应的记录
-            	
-            	//String intro_cdate = this.getBugIntroCdate(file_id, cid);//获取该bug被引入的日期
-                //this.loadBuggyEntity(file_id, cid, cdate, intro_cdate);//向cache中加载，引入日期的相应的记录
-            //}else{ //if(numprefetch < prefetchsize)
-            //时间局部性，如果该文件发生更改，将该文件预取到缓存中，同时和它相关联的文件也要加入到缓存
-
-            	//this.loadChangeEntity(file_id, cid, cdate);//向cache中加载，引入日期的相应的记录
-            	
-            	//numprefetch++;
-                //cache.add(file_id, cid, cdate, CacheItem.CacheReason.Prefetch); 
-            //}
+        }
+        return numprefetch;
+    }
+    
+    /**
+     * 
+     */
+    private int statisOneFile(int cid, String cdate, boolean isBugFix,
+            int file_id, FileType type, int numprefetch) throws Exception {
+    	//System.out.print(cid + " : " + file_id+"*********");
+        switch (type) {
+        case V:
+            break;
+        case R:
+        case C:
+        case A:
+            cache.add(file_id, cid, cdate, CacheItem.CacheReason.NewEntity);//将该条记录加入cache
+            break;
+        case D:
+            if(cache.contains(file_id)){
+                this.cache.remove(file_id, cdate);//如果文件被删除，要从cache中移除
+            }
+            break;
+        case M: // modified
+        	this.loadBuggyEntity(file_id, cid, cdate, cdate);//向cache中加载，引入日期的相应的记录
         }
         return numprefetch;
     }
@@ -398,7 +407,7 @@ public class Simulator {
      * input: pre-fetch size
      */
     public void initialPreLoad() {
-    	//按照初始时刻文件源码的行数代销降序排序，将文件行数最大的那些加载进内存
+    	//按照初始时刻文件源码的行数降序排序，将文件行数最大的那些加载进内存
         final String findInitialPreload = "select content_loc.file_id, content_loc.commit_id "
             + "from content_loc, scmlog, actions, file_types "
             + "where repository_id=? and content_loc.commit_id = scmlog.id and commit_date =? "
@@ -418,7 +427,14 @@ public class Simulator {
         } catch (SQLException e1) {
             e1.printStackTrace();
         }
-
+        String initialLoadQueryStr = "select content_loc.file_id, content_loc.commit_id "
+                + "from content_loc, scmlog, actions, file_types "
+                + "where repository_id=" + pid 
+                + " and content_loc.commit_id = scmlog.id "
+                + " and content_loc.file_id=actions.file_id "
+                + "and content_loc.commit_id=actions.commit_id and actions.type!='D' "
+                + "and file_types.file_id=content_loc.file_id and file_types.type='code' order by scmlog.commit_date limit " + prefetchsize;
+        //System.out.println(initialLoadQueryStr);
         for (int size = 0; size < prefetchsize; size++) {
             try {
                 if (r.next()) {
@@ -603,6 +619,8 @@ public class Simulator {
         CmdLineParser.Option save_opt = parser.addBooleanOption('o',"save");
         CmdLineParser.Option tune_opt = parser.addBooleanOption('u', "tune");
         CmdLineParser.Option name_opt = parser.addStringOption('n', "name");
+        CmdLineParser.Option val_opt = parser.addBooleanOption('v', "validate");
+        CmdLineParser.Option path_opt = parser.addStringOption('d', "path");
         // CmdLineParser.Option sCId_opt = parser.addIntegerOption('s',"start");
         // CmdLineParser.Option eCId_opt = parser.addIntegerOption('e',"end");
         try {
@@ -623,7 +641,9 @@ public class Simulator {
         String end = (String) parser.getOptionValue(ed_opt, null);
         Boolean saveToFile = (Boolean) parser.getOptionValue(save_opt, false);
         Boolean tune = (Boolean)parser.getOptionValue(tune_opt, false);
+        Boolean validate = (Boolean)parser.getOptionValue(val_opt, false);
         String name = (String) parser.getOptionValue(name_opt, null);
+        String outPath = (String) parser.getOptionValue(path_opt, null);
         
         CacheReplacement.Policy crp;
         try {
@@ -646,7 +666,12 @@ public class Simulator {
         Simulator sim;
         //for(int i = 0 ; i < projects.length; i++){
         	//System.out.println("==================================" + projects[i] + "==================================");
-        	result_dir += name + "7/";// + projects[i] + "3/";		//*
+	        if(outPath != null){
+	        	result_dir = outPath + name + "7/";
+	        }else{
+	        	result_dir += name + "7/";// + projects[i] + "3/";		//*
+	        }
+        	
         	if(!new File(result_dir).exists()){					//*
             	new File(result_dir).mkdirs();		//*
         	}else{
@@ -655,10 +680,14 @@ public class Simulator {
         		//return;
         	}
         	
-        	conn = DatabaseManager.getConnection(); 	//*	projects[i]
+        	conn = DatabaseManager.getConnection(name); 	//*	projects[i]
         	checkParameter(start, end, pid);
 	        //调整参数
-	        if(tune)
+	        if(validate){
+	            System.out.println("parameters analyze...");
+	            sim = validate(pid);
+	            System.out.println(".... finished analyze!");
+	        }else if(tune)
 	        {
 	            System.out.println("tuning...");
 	            sim = tune(pid);
@@ -668,8 +697,7 @@ public class Simulator {
 	        else
 	        {
 	        				
-	            sim = new Simulator(blksz, pfsz, csz, pid, crp, start, end, saveToFile);
-	            										
+	            sim = new Simulator(blksz, pfsz, csz, pid, crp, start, end, saveToFile);									
 	            sim.initialPreLoad();//预加载
 	            sim.simulate();//进行仿真
 	            //保存结果
@@ -677,9 +705,8 @@ public class Simulator {
 	            {
 	                sim.csvWriter.close();
 	                sim.outputFileDist();
+	                sim.outputFileChangeReason();
 	            }
-	            
-	
 	        }
 	
 	        // should always happen
@@ -710,7 +737,6 @@ public class Simulator {
 
 
         System.out.println("\nResults:");
-
         System.out.print("Hit rate...");
         System.out.println(sim.getHitRate());
 
@@ -719,6 +745,9 @@ public class Simulator {
 
         System.out.print("Num bug fixes...");
         System.out.println(sim.getHit() + sim.getMiss());
+        
+        System.out.print("Num changed actions...");
+        System.out.println(CountChanged);
     }
 
 
@@ -726,14 +755,15 @@ public class Simulator {
     {
         Simulator maxsim = null;
         double maxhitrate = 0;
-        int blksz;
-        int pfsz;
+
         int onepercent = getPercentOfFiles(pid);
         System.out.println("One percent of files: " + onepercent);
-        
+        int blksz = onepercent;
+        int pfsz = onepercent;
+        int csz = 0;
         final int UPPER = 10*onepercent;
         CacheReplacement.Policy crp = CacheReplacement.REPDEFAULT;
-
+        
         for(blksz=onepercent;blksz<UPPER;blksz+=onepercent*2){
             for(pfsz=onepercent;pfsz<UPPER;pfsz+=onepercent*2){
                 final Simulator sim = new Simulator(blksz, pfsz,-1, pid, crp, null, null, false);
@@ -763,7 +793,90 @@ public class Simulator {
                 maxsim = sim;
             }
         }
+        
+        /*for(int i = 0; i < 10; i++){
+        	csz = csz + UPPER;
+            final Simulator sim = new Simulator(-1, -1,csz, pid, crp, null, null, false);
+            sim.initialPreLoad();
+            sim.simulate();
+            System.out.println((i+1) + "（"+csz+ "): " + sim.getHitRate());
+            if(sim.getHitRate()>maxhitrate)
+            {
+                maxhitrate = sim.getHitRate();
+                maxsim = sim;
+            }
 
+        }*/
+        maxsim.close();
+        return maxsim;
+    }
+    
+    private static Simulator validate(int pid)
+    {
+        Simulator maxsim = null;
+        double maxhitrate = 0;
+
+        int onepercent = getPercentOfFiles(pid);
+        System.out.println("One percent of files: " + onepercent);
+        int blksz = onepercent;
+        int pfsz = onepercent;
+        int csz = 0;
+        final int UPPER = 10*onepercent;
+        CacheReplacement.Policy crp = CacheReplacement.REPDEFAULT;
+        int maxblksz = Integer.MIN_VALUE;
+        int maxpfsz = Integer.MIN_VALUE;
+        System.out.println("Trying out different block size...");
+        ArrayList<Double[]> paras = new ArrayList<Double[]>();
+        for(blksz=onepercent;blksz<UPPER;blksz+=onepercent){
+        	
+                final Simulator sim = new Simulator(blksz, pfsz,-1, pid, crp, null, null, false);
+                sim.initialPreLoad();
+                sim.simulate();
+                System.out.println(sim.cachesize + "," + sim.blocksize + "," + sim.prefetchsize + " : " + sim.getHitRate());
+                paras.add(new Double[]{(double) sim.cachesize, (double) sim.blocksize ,(double) sim.prefetchsize ,sim.getHitRate()});
+                if(sim.getHitRate()>maxhitrate)
+                {
+                    maxhitrate = sim.getHitRate();
+                    maxsim = sim;
+                    maxblksz = blksz;
+                }
+
+        }
+    	CsvWriter csvTempWriter = new CsvWriter(result_dir + "block" + ".csv");
+        outputParameterTune(csvTempWriter,paras);
+        System.out.println("Trying out different prefetch size...");
+        blksz = maxblksz;
+        paras = new ArrayList<Double[]>();
+        for(pfsz=onepercent;pfsz<UPPER;pfsz+=onepercent){
+            final Simulator sim = new Simulator(blksz, pfsz,-1, pid, crp, null, null, false);
+            sim.initialPreLoad();
+            sim.simulate();
+            System.out.println(sim.cachesize + "," + sim.blocksize + "," + sim.prefetchsize + " : " + sim.getHitRate());
+            paras.add(new Double[]{(double) sim.cachesize, (double) sim.blocksize ,(double) sim.prefetchsize ,sim.getHitRate()});
+            if(sim.getHitRate()>maxhitrate)
+            {
+                maxhitrate = sim.getHitRate();
+                maxsim = sim;
+                maxpfsz = pfsz;
+            }
+        }
+        paras.add(new Double[]{(double) 0, (double) maxblksz ,(double) maxpfsz ,maxhitrate});
+        csvTempWriter = new CsvWriter(result_dir + "prefetch" + ".csv");
+        outputParameterTune(csvTempWriter,paras);
+        
+        /*for(int i = 0; i < 10; i++){
+        	csz = csz + UPPER;
+            final Simulator sim = new Simulator(-1, -1,csz, pid, crp, null, null, false);
+            sim.initialPreLoad();
+            sim.simulate();
+            System.out.println((i+1) + "（"+csz+ "): " + sim.getHitRate());
+            if(sim.getHitRate()>maxhitrate)
+            {
+                maxhitrate = sim.getHitRate();
+                maxsim = sim;
+            }
+
+        }*/
         maxsim.close();
         return maxsim;
     }
@@ -784,7 +897,7 @@ public class Simulator {
             // csvWriter.write("# number of hit, misses and time stayed in Cache for every file");
             csvWriter.writeComment("number of hit, misses and time stayed in Cache for every file");
             csvWriter.writeComment("project: " + pid +  ", total_files: " + total_files + ", total_files_alive: " + total_files_alive  + ", cacheTableSize: " + cache.getCacheSizeEver() + ", cachesize: " + cachesize
-                    + ", blocksize: " + cachesize + ", prefetchsize: "
+                    + ", blocksize: " + blocksize + ", prefetchsize: "
                     + prefetchsize + ", cache replacement policy: " + cacheRep);
             csvWriter.write("file_id");
             csvWriter.write("loc");
@@ -794,9 +907,14 @@ public class Simulator {
             csvWriter.write("duration");
             csvWriter.write("reason");
             csvWriter.write("is_in_cache");
-            csvWriter.write("Prefetch");
-            csvWriter.write("CoChange");
-            csvWriter.write("BugEntity");
+            csvWriter.write("HitPrefetch");
+            csvWriter.write("HitCoChange");
+            csvWriter.write("HitChangeEntity");
+            csvWriter.write("HitNewEntity");
+            csvWriter.write("LoadPrefetch");
+            csvWriter.write("LoadCoChange");
+            csvWriter.write("LoadChangeEntity");
+            csvWriter.write("LoadNewEntity");
             csvWriter.endRecord();
             csvWriter.write("0");
             csvWriter.write("0");
@@ -806,6 +924,11 @@ public class Simulator {
             csvWriter.write(Integer.toString(cache.getTotalDuration()));
             csvWriter.write("0");
             csvWriter.write("false");
+            csvWriter.write("0");
+            csvWriter.write("0");
+            csvWriter.write("0");
+            csvWriter.write("0");
+            csvWriter.write("0");
             csvWriter.write("0");
             csvWriter.write("0");
             csvWriter.write("0");
@@ -823,14 +946,80 @@ public class Simulator {
                 csvWriter.write(Integer.toString(ci.getDuration()));
                 csvWriter.write(ci.getReason());
                 csvWriter.write(ci.isInCache()?"true":"false");
-                int[] temp = ci.getHitTypeCnt();
-                csvWriter.write(Integer.toString(temp[0]));
-                csvWriter.write(Integer.toString(temp[1]));
-                csvWriter.write(Integer.toString(temp[2]));
+                int[] temp0 = ci.getHitTypeCnt();
+                csvWriter.write(Integer.toString(temp0[0]));
+                csvWriter.write(Integer.toString(temp0[1]));
+                csvWriter.write(Integer.toString(temp0[2]));
+                csvWriter.write(Integer.toString(temp0[3]));
+                int[] temp1 = ci.getLoadTypeCnt();
+                csvWriter.write(Integer.toString(temp1[0]));
+                csvWriter.write(Integer.toString(temp1[1]));
+                csvWriter.write(Integer.toString(temp1[2]));
+                csvWriter.write(Integer.toString(temp1[3]));
                 csvWriter.endRecord();
             }
 
             csvWriter.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+    
+    public void outputFileChangeReason() {
+    	//输出最终缓存中的文件列表
+        csvWriter = new CsvWriter(result_dir + filename + "_filechangereason.csv");
+        csvWriter.setComment('#');
+        try {
+            // csvWriter.write("# number of hit, misses and time stayed in Cache for every file");
+            csvWriter.writeComment("number of hit, misses and time stayed in Cache for every file");
+            csvWriter.writeComment("project: " + pid +  ", total_files: " + total_files + ", total_files_alive: " + total_files_alive  + ", cacheTableSize: " + cache.getCacheSizeEver() + ", cachesize: " + cachesize
+                    + ", blocksize: " + cachesize + ", prefetchsize: "
+                    + prefetchsize + ", cache replacement policy: " + cacheRep);
+            csvWriter.write("file_id");
+            csvWriter.write("loc");
+            csvWriter.write("last_type");
+            csvWriter.write("duration");
+            csvWriter.endRecord();
+            // else assume that the file already has the correct header line
+            // write out record
+            //XXX rewrite with built in iteratable
+            for (CacheItem ci : cache){
+            	//if(!ci.isInCache()) continue;
+            	for (int[] item : ci.getLastTypeCnt()){
+                csvWriter.write(Integer.toString(ci.getEntityId()));
+                csvWriter.write(Integer.toString(ci.getLOC())); // LOC at time of last update
+                csvWriter.write(Integer.toString(item[0]));
+                csvWriter.write(Integer.toString(item[1]));
+                csvWriter.endRecord();
+            	}
+            }
+            csvWriter.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+    
+    public static void outputParameterTune(CsvWriter csvTempWriter, ArrayList<Double[]> paras) {
+    	//输出最终缓存中的文件列表
+        try {
+        	csvTempWriter.write("cachesize");
+        	csvTempWriter.write("blocksize");
+        	csvTempWriter.write("prefetchsize");
+        	csvTempWriter.write("hitrate");
+        	csvTempWriter.endRecord();
+            // else assume that the file already has the correct header line
+            // write out record
+            //XXX rewrite with built in iteratable
+            for (Double[] item : paras){
+            	csvTempWriter.write(Double.toString(item[0]));
+            	csvTempWriter.write(Double.toString(item[1]));
+            	csvTempWriter.write(Double.toString(item[2]));
+            	csvTempWriter.write(Double.toString(item[3]));
+            	csvTempWriter.endRecord();
+            }
+            csvTempWriter.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
