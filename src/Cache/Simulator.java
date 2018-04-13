@@ -361,30 +361,6 @@ public class Simulator {
         return numprefetch;
     }
     
-    /**
-     * 
-     */
-    private int statisOneFile(int cid, String cdate, boolean isBugFix,
-            int file_id, FileType type, int numprefetch) throws Exception {
-    	//System.out.print(cid + " : " + file_id+"*********");
-        switch (type) {
-        case V:
-            break;
-        case R:
-        case C:
-        case A:
-            cache.add(file_id, cid, cdate, CacheItem.CacheReason.NewEntity);//将该条记录加入cache
-            break;
-        case D:
-            if(cache.contains(file_id)){
-                this.cache.remove(file_id, cdate);//如果文件被删除，要从cache中移除
-            }
-            break;
-        case M: // modified
-        	this.loadBuggyEntity(file_id, cid, cdate, cdate);//向cache中加载，引入日期的相应的记录
-        }
-        return numprefetch;
-    }
 
     /**
      * Gets the current hit rate of the cache

@@ -95,6 +95,7 @@ public class CacheItem {
      */
     public void update(int cid, String cdate, String sdate, CacheReason r) {
         // update the load count each time an entry is added to the cache
+        //if(entityId == 11303) System.out.println(entityId + "," + r + "," + cdate + "," + (lastCommitDate==null?"null":lastCommitDate)+ "," + inCache);
         if (!inCache){
             inCache = true;
             loadTypeCnt[r.ordinal()]++;//calculate the reason of every load
@@ -103,9 +104,9 @@ public class CacheItem {
             if (r == CacheReason.BugEntity){
                 missCount++;
                 if(lastCommitDate != null){
-                	lastTypeCnt.add(new int[]{reason.ordinal(),Util.Dates.getMinuteDuration(lastCommitDate,cdate)});
-                	//System.out.println(lastCommitDate+"------------"+cdate+"="+Util.Dates.getMinuteDuration(lastCommitDate,cdate));
-                }
+                	lastTypeCnt.add(new int[]{reason.ordinal(),Util.Dates.getMinuteDuration(lastCommitDate,cdate)}); 
+                	//if(entityId == 11303) System.out.println(Util.Dates.getMinuteDuration(lastCommitDate,cdate));
+                	}
             }
             timeAdded = cdate;
             
@@ -115,17 +116,20 @@ public class CacheItem {
                 hitTypeCnt[r.ordinal()]++;//calculate the hit reason of every hit
                 if(lastCommitDate != null){
                 	lastTypeCnt.add(new int[]{reason.ordinal(),Util.Dates.getMinuteDuration(lastCommitDate,cdate)});
+                	//if(entityId == 11303) System.out.println(Util.Dates.getMinuteDuration(lastCommitDate,cdate));
                 }
             }
         }
-        //System.out.println(r + "-----" + cid+"------------"+cdate+"---------------"+lastCommitDate);
+
         if(r != CacheReason.CoChange && r != CacheReason.Prefetch) {
+        	//if(entityId == 11303) System.out.println(r + "-----update lastCommitDate");
         	lastCommitDate = cdate;
             LOC = findLoc(entityId, cid);
             number = findNumber(entityId, parent.repID, cdate, sdate, parent.getPolicy());
+            reason = r;//update the reason to current reason
         }
         lastLoadDate = cdate;
-        reason = r;//update the reason to current reason
+       
         loadDate = parent.getTime(); 
     }
     
@@ -139,7 +143,6 @@ public class CacheItem {
         loadDuration += Util.Dates.getMinuteDuration(timeAdded, cdate);
         assert(inCache);
         inCache = false;
-        lastCommitDate = cdate;
         return loadDuration;
     }
 
@@ -355,6 +358,10 @@ public class CacheItem {
     
     public ArrayList<int[]> getLastTypeCnt() {
         return lastTypeCnt;
+    }
+    
+    private void print(){
+    	System.out.println(this.toString());
     }
 
 }
